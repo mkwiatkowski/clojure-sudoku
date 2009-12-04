@@ -28,13 +28,16 @@
 (def columns (partition 9 (for [[x y] coords] [y x])))
 (def groups (concat blocks rows columns))
 
+(defmacro row [e] `(~e 0))
+(defmacro column [e] `(~e 1))
+
 (defn same-row? [c1 c2]
-  (= (first c1) (first c2)))
+  (= (row c1) (row c2)))
 (defn same-col? [c1 c2]
-  (= (second c1) (second c2)))
+  (= (column c1) (column c2)))
 (defn same-block? [c1 c2]
-  (and (= (quot (- (first c1) 1) 3) (quot (- (first c2) 1) 3))
-       (= (quot (- (second c1) 1) 3) (quot (- (second c2) 1) 3))))
+  (and (= (quot (- (row c1) 1) 3) (quot (- (row c2) 1) 3))
+       (= (quot (- (column c1) 1) 3) (quot (- (column c2) 1) 3))))
 (defn neighbours? [c1 c2]
   (some #(% c1 c2) [same-row? same-col? same-block?]))
 
@@ -48,7 +51,7 @@
 
 (defn mark
   ([board element]
-     (mark board (first element) (second element)))
+     (mark board (row element) (column element)))
   ([board coord value]
      (into {}
            (for [[c v] board]
