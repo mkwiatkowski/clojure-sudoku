@@ -19,7 +19,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board representation.
 ;;
-;; Board is a sorted map of coordinates (pairs of numbers, e.g. [3 5]) to
+;; Board is a hash map of coordinates (pairs of numbers, e.g. [3 5]) to
 ;;   values (either an integer or set of possible numbers).
 
 (def coords (for [x (range 1 10) y (range 1 10)] [x y]))
@@ -39,7 +39,7 @@
   (some #(% c1 c2) [same-row? same-col? same-block?]))
 
 (def empty-board
-     (into (sorted-map)
+     (into {}
            (for [coord coords]
              [coord (set (range 1 10))])))
 
@@ -50,7 +50,7 @@
   ([board element]
      (mark board (first element) (second element)))
   ([board coord value]
-     (into (sorted-map)
+     (into {}
            (for [[c v] board]
              (cond
                (= c coord)                          [c value]
@@ -155,7 +155,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [[c v] board] (if (number? v) (str v) "."))]
+  (let [elements (for [[c v] (sort board)] (if (number? v) (str v) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
