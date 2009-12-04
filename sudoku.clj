@@ -115,6 +115,8 @@
 
 (defn- solved? [board]
   (every? number? (vals board)))
+(defn- unsolvable? [board]
+  (some empty? (filter set? (vals board))))
 
 (def solving-methods
      (list solve-with-naked-single solve-with-hidden-single solve-by-guessing))
@@ -134,7 +136,7 @@
   (if (solved? board)
     board
     (let [new-board (solve-step board)]
-      (if (= board new-board)
+      (if (or (= board new-board) (unsolvable? new-board))
         board
         (recur new-board)))))
 
