@@ -102,8 +102,8 @@
 (declare solve solved?)
 
 (defn element-with-least-possibilities [board]
-  (first (sort #(compare (count (val %1)) (count (val %2)))
-               (filter #(set? (val %)) board))))
+  (apply min-key #(count (val %))
+         (filter #(set? (val %)) board)))
 
 (defn solve-by-guessing [board]
   (let [element (element-with-least-possibilities board)]
