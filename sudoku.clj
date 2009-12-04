@@ -116,11 +116,19 @@
 (defn- solved? [board]
   (every? number? (vals board)))
 
-(defn- solve-step [board]
-  (let [new-board (solve-with-hidden-single (solve-with-naked-single board))]
-    (if (= new-board board)
-      (solve-by-guessing board)
-      new-board)))
+(def solving-methods
+     (list solve-with-naked-single solve-with-hidden-single solve-by-guessing))
+
+(defn- solve-step
+  ([board]
+     (solve-step board solving-methods))
+  ([board methods]
+     (if-let [method (first methods)]
+       (let [new-board (method board)]
+         (if (= new-board board)
+           (solve-step board (rest methods))
+           new-board))
+       board)))
 
 (defn solve [board]
   (if (solved? board)
