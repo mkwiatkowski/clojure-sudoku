@@ -106,11 +106,9 @@
                (filter #(set? (val %)) board))))
 
 (defn solve-by-guessing [board]
-  (let [element (element-with-least-possibilities board)
-        boards (map solve (map #(mark board (key element) %) (val element)))]
-    (if-let [solved-board (first (filter solved? boards))]
-      solved-board
-      board)))
+  (let [element (element-with-least-possibilities board)]
+    (or (first (filter solved? (map solve (map #(mark board (key element) %) (val element)))))
+        board)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Solve function that combines all methods.
