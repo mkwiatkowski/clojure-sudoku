@@ -23,7 +23,7 @@
 ;;   values (either an integer or set of possible numbers).
 
 (def coords (for [x (range 1 10) y (range 1 10)] [x y]))
-(def blocks (for [i [1 4 7] j [1 4 7]] (into #{} (for [x (range i (+ i 3)) y (range j (+ j 3))] [x y]))))
+(def blocks (for [i [1 4 7] j [1 4 7]] (for [x (range i (+ i 3)) y (range j (+ j 3))] [x y])))
 (def rows (partition 9 coords))
 (def columns (partition 9 (for [[x y] coords] [y x])))
 (def groups (concat blocks rows columns))
