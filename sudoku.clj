@@ -45,15 +45,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board.
 
+(defn eliminate [board coord possibility]
+  (let [value (board coord)
+        new-value (if (set? value) (disj value possibility) value)]
+    (conj board [coord new-value])))
+
 (defn mark
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (into (conj board [coord value])
-           (for [n (neighbours-of coord)]
-             [n
-              (let [v (board n)]
-                (if (set? v) (disj v value) v))]))))
+     (reduce #(eliminate %1 %2 value)
+             (conj board [coord value])
+             (neighbours-of coord))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Naked single method
