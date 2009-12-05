@@ -28,18 +28,14 @@
 (def columns (partition 9 (for [[x y] coords] [y x])))
 (def groups (concat blocks rows columns))
 
-(defmacro row [e] `(~e 0))
-(defmacro column [e] `(~e 1))
-
-(defn same-row? [c1 c2]
-  (= (row c1) (row c2)))
-(defn same-col? [c1 c2]
-  (= (column c1) (column c2)))
-(defn same-block? [c1 c2]
-  (and (= (quot (- (row c1) 1) 3) (quot (- (row c2) 1) 3))
-       (= (quot (- (column c1) 1) 3) (quot (- (column c2) 1) 3))))
-(defn neighbours? [c1 c2]
-  (some #(% c1 c2) [same-row? same-col? same-block?]))
+(def groups-of
+     (into {}
+           (for [c coords]
+             [c (filter #(contains? % c) (map set groups))])))
+(def neighbours-of
+     (into {}
+           (for [c coords]
+             [c (vec (disj (set (apply concat (groups-of c))) c))])))
 
 (def empty-board
      (into {}
@@ -51,14 +47,13 @@
 
 (defn mark
   ([board element]
-     (mark board (row element) (column element)))
+     (mark board (element 0) (element 1)))
   ([board coord value]
-     (into {}
-           (for [[c v] board]
-             (cond
-               (= c coord)                          [c value]
-               (and (set? v) (neighbours? c coord)) [c (disj v value)]
-               true                                 [c v])))))
+     (into (conj board [coord value])
+           (for [n (neighbours-of coord)]
+             [n
+              (let [v (board n)]
+                (if (set? v) (disj v value) v))]))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Naked single method
