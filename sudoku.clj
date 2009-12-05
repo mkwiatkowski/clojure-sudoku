@@ -46,9 +46,10 @@
 ;; Mark a number on board.
 
 (defn eliminate [board coord possibility]
-  (let [value (board coord)
-        new-value (if (set? value) (disj value possibility) value)]
-    (conj board [coord new-value])))
+  (let [value (board coord)]
+    (if (set? value)
+      (conj board [coord (disj value possibility)])
+      board)))
 
 (defn mark
   ([board element]
