@@ -1,146 +1,106 @@
 (ns sudoku
-  (:use [clojure.contrib.str-utils2 :only (join)]
-        [clojure.contrib.seq-utils :only (frequencies)]
+  (:use [clojure.set :only (union)]
+        [clojure.contrib.str-utils2 :only (join)]
         [clojure.test :only (is run-tests with-test)]))
-
-(with-test
- (defn find-uniq
-   "From a collection of values return one that appears only once."
-   [values]
-   (first
-    (for [[value counter] (frequencies values)
-          :when (= counter 1)]
-      value)))
- (is (=         2      (find-uniq [1 2 1])))
- (is (=         nil    (find-uniq [1 2 1 2])))
- (is (contains? #{1 2} (find-uniq [1 2])))
- (is (=         nil    (find-uniq []))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board representation.
-;;
-;; Board is a hash map of coordinates (pairs of numbers, e.g. [3 5]) to
-;;   values (either an integer or set of possible numbers).
 
 (def coords (for [x (range 1 10) y (range 1 10)] [x y]))
-(def blocks (for [i [1 4 7] j [1 4 7]] (for [x (range i (+ i 3)) y (range j (+ j 3))] [x y])))
-(def rows (partition 9 coords))
-(def columns (partition 9 (for [[x y] coords] [y x])))
-(def groups (concat blocks rows columns))
+(let [blocks (for [i [1 4 7] j [1 4 7]]
+               (for [x (range i (+ i 3)) y (range j (+ j 3))] [x y]))
+      rows (partition 9 coords)
+      columns (partition 9 (for [[x y] coords] [y x]))]
+  (def groups (concat blocks rows columns)))
 
 (def groups-of
      (into {}
            (for [c coords]
-             [c (filter #(contains? % c) (map set groups))])))
+             [c (for [coords groups :when (contains? (set coords) c)] coords)])))
 (def neighbours-of
      (into {}
            (for [c coords]
-             [c (vec (disj (set (apply concat (groups-of c))) c))])))
+             [c (vec (disj (apply union (map set (groups-of c))) c))])))
 
-(def empty-board
-     (into {}
-           (for [coord coords]
-             [coord (set (range 1 10))])))
+(defstruct board :boxes :solvedno)
+(let [boxes (into {} (for [coord coords] [coord (set (range 1 10))]))]
+  (def empty-board
+       (struct-map board :boxes boxes :solvedno 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Mark a number on board.
+;; Helpers
 
-(defn eliminate [board coord possibility]
-  (let [value (board coord)]
-    (if (set? value)
-      (conj board [coord (disj value possibility)])
-      board)))
+(defmacro update [map key f]
+  `(let [map# ~map key# ~key]
+     (assoc map# key# (~f (map# key#)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Mark a number on board. Eliminate a number from the set of possibilities.
+
+(declare eliminate)
 
 (defn mark
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (reduce #(eliminate %1 %2 value)
-             (conj board [coord value])
-             (neighbours-of coord))))
+     (reduce #(eliminate %1 coord %2) board (disj ((board :boxes) coord) value))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Naked single method
-;; http://www.sadmansoftware.com/sudoku/nakedsingle.htm
-
-(defn- naked-single? [element]
-  (let [value (val element)]
-    (and (set? value) (= (count value) 1))))
-
-(defn solve-with-naked-single [board]
-  (if-let [element (first (filter naked-single? board))]
-    (mark board (key element) (first (val element)))
-    board))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hidden single method
 ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
+(defn hidden-single [board coord value]
+  (first
+   (filter
+    identity
+    (for [group (groups-of coord)]
+      (let [coords-with-value (filter #(contains? ((board :boxes) %) value) group)]
+        (cond
+          (empty? coords-with-value)        (throw (Error.))
+          (empty? (rest coords-with-value)) (first coords-with-value)
+          true                              nil))))))
 
-(defn group-values [board group]
-  (apply concat (remove number? (map board group))))
+(defn eliminate-from-neighbours [board coord value]
+  (reduce #(eliminate %1 %2 value) board (neighbours-of coord)))
 
-(defn contains-possibility? [cell possibility]
-  (let [value (second cell)]
-    (and (not (number? value))
-         (contains? value possibility))))
-
-(defn cell-with-possibility [cells value]
-  (first (first (filter #(contains-possibility? % value) cells))))
-
-(defn hidden-singles [board]
-  (for [group groups
-        :let [val (find-uniq (group-values board group))]
-        :when (not (nil? val))]
-    [(cell-with-possibility (for [coord group] [coord (board coord)]) val) val]))
-
-(defn solve-with-hidden-single [board]
-  (if-let [element (first (hidden-singles board))]
-    (mark board element)
+(defn eliminate [board coord possibility]
+  (if (contains? ((board :boxes) coord) possibility)
+    (let [board (update-in board [:boxes coord] disj possibility)
+          possibilities ((board :boxes) coord)
+          size (count possibilities)]
+      (cond
+        ;; Contradiction.
+        (== size 0) (throw (Error.))
+        ;; Naked single method
+        ;; http://www.sadmansoftware.com/sudoku/nakedsingle.htm
+        (== size 1) (update
+                     (eliminate-from-neighbours board coord (first possibilities))
+                     :solvedno inc)
+        true        (if-let [coord (hidden-single board coord possibility)]
+                      (mark board coord possibility)
+                      board)))
     board))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Guessing method.
-
-(declare solve solved?)
+;; Solve.
 
 (defn element-with-least-possibilities [board]
   (apply min-key #(count (val %))
-         (filter #(set? (val %)) board)))
-
-(defn solve-by-guessing [board]
-  (let [element (element-with-least-possibilities board)]
-    (or (first (filter solved? (map solve (map #(mark board (key element) %) (val element)))))
-        board)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Solve function that combines all methods.
+         (filter #(> (count (val %)) 1) (board :boxes))))
 
 (defn- solved? [board]
-  (every? number? (vals board)))
-(defn- unsolvable? [board]
-  (some empty? (filter set? (vals board))))
-
-(def solving-methods
-     (list solve-with-naked-single solve-with-hidden-single solve-by-guessing))
-
-(defn- solve-step
-  ([board]
-     (solve-step board solving-methods))
-  ([board methods]
-     (if-let [method (first methods)]
-       (let [new-board (method board)]
-         (if (= new-board board)
-           (solve-step board (rest methods))
-           new-board))
-       board)))
+  (== (board :solvedno) 81))
 
 (defn solve [board]
   (if (solved? board)
     board
-    (let [new-board (solve-step board)]
-      (if (or (= board new-board) (unsolvable? new-board))
-        board
-        (recur new-board)))))
+    (let [[coord values] (element-with-least-possibilities board)]
+      (or
+       (first (filter solved?
+             (map
+              #(try
+                (solve (mark board coord %))
+                (catch Error e board))
+              values)))
+       board))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reading the board from file.
@@ -159,7 +119,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [[c v] (sort board)] (if (number? v) (str v) "."))]
+  (let [elements (for [[c v] (sort (board :boxes))] (if (== (count v) 1) (str (first v)) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
