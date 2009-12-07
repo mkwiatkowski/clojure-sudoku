@@ -22,10 +22,11 @@
            (for [c coords]
              [c (vec (disj (apply union (map set (groups-of c))) c))])))
 
-(defstruct board :boxes :solvedno)
 (let [boxes (into {} (for [coord coords] [coord (set (range 1 10))]))]
-  (def empty-board
-       (struct-map board :boxes boxes :solvedno 0)))
+  (def empty-board (assoc boxes :solvedno 0)))
+
+(defmacro boxes [board]
+  `(dissoc ~board :solvedno))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -43,15 +44,15 @@
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (reduce #(eliminate %1 coord %2) board (disj ((board :boxes) coord) value))))
+     (reduce #(eliminate %1 coord %2) board (disj (board coord) value))))
 
 (defn eliminate-from-neighbours [board coord value]
   (reduce #(eliminate %1 %2 value) board (neighbours-of coord)))
 
 (defn eliminate [board coord possibility]
-  (if (contains? ((board :boxes) coord) possibility)
-    (let [board (update-in board [:boxes coord] disj possibility)
-          possibilities ((board :boxes) coord)
+  (if (contains? (board coord) possibility)
+    (let [board (update board coord #(disj % possibility))
+          possibilities (board coord)
           size (count possibilities)]
       (cond
         ;; Contradiction.
@@ -68,7 +69,7 @@
                       (fn [result group]
                         (or
                          result
-                         (let [coords-with-value (filter #(contains? ((board :boxes) %) possibility) group)]
+                         (let [coords-with-value (filter #(contains? (board %) possibility) group)]
                            (cond
                              (empty? coords-with-value)        (throw (Error.))
                              (empty? (rest coords-with-value)) (mark board (first coords-with-value) possibility)
@@ -83,7 +84,7 @@
 
 (defn element-with-least-possibilities [board]
   (apply min-key #(count (val %))
-         (filter #(> (count (val %)) 1) (board :boxes))))
+         (filter #(> (count (val %)) 1) (boxes board))))
 
 (defn- solved? [board]
   (== (board :solvedno) 81))
@@ -118,7 +119,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [[c v] (sort (board :boxes))] (if (== (count v) 1) (str (first v)) "."))]
+  (let [elements (for [[c v] (sort (boxes board))] (if (== (count v) 1) (str (first v)) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
