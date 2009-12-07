@@ -1,7 +1,6 @@
 (ns sudoku
   (:use [clojure.set :only (union)]
-        [clojure.contrib.str-utils2 :only (join)]
-        [clojure.test :only (is run-tests with-test)]))
+        [clojure.contrib.str-utils2 :only (join)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board representation.
@@ -131,7 +130,6 @@
 (defn main
   ([progname]
      (printf "Usage: %s puzzle-file...%n" progname)
-     (run-tests)
      (System/exit 0))
   ([_ & filenames]
      (let [start (.. System nanoTime)]
