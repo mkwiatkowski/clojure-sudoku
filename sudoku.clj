@@ -8,10 +8,11 @@
 
 (def coords (for [x (range 1 10) y (range 1 10)] [x y]))
 (let [blocks (for [i [1 4 7] j [1 4 7]]
-               (for [x (range i (+ i 3)) y (range j (+ j 3))] [x y]))
-      rows (partition 9 coords)
-      columns (partition 9 (for [[x y] coords] [y x]))]
+               (for [x (range i (+ i 3)) y (range j (+ j 3))] (keyword (str [x y]))))
+      rows (partition 9 (map #(keyword (str %)) coords))
+      columns (partition 9 (for [[x y] coords] (keyword (str [y x]))))]
   (def groups (concat blocks rows columns)))
+(def coords (map #(keyword (str %)) coords))
 
 (def groups-of
      (into {}
