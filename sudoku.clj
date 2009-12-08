@@ -25,15 +25,17 @@
 (let [boxes (into {} (for [coord coords] [coord (set (range 1 10))]))]
   (def empty-board (assoc boxes :solvedno 0)))
 
-(defmacro boxes [board]
-  `(dissoc ~board :solvedno))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Helpers
-
 (defmacro update [map key f]
   `(let [map# ~map key# ~key]
      (assoc map# key# (~f (map# key#)))))
+(defmacro boxes [board]
+  `(dissoc ~board :solvedno))
+(defmacro update-coord [board coord f]
+  `(update ~board ~coord ~f))
+(defmacro inc-solved-no [board]
+  `(update ~board :solvedno inc))
+(defmacro solvedno [board]
+  `(~board :solvedno))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board. Eliminate a number from the set of possibilities.
@@ -51,7 +53,7 @@
 
 (defn eliminate [board coord possibility]
   (if (contains? (board coord) possibility)
-    (let [board (update board coord #(disj % possibility))
+    (let [board (update-coord board coord #(disj % possibility))
           possibilities (board coord)
           size (count possibilities)]
       (cond
@@ -59,9 +61,7 @@
         (== size 0) (throw (Error.))
         ;; Naked single method
         ;; http://www.sadmansoftware.com/sudoku/nakedsingle.htm
-        (== size 1) (update
-                     (eliminate-from-neighbours board coord (first possibilities))
-                     :solvedno inc)
+        (== size 1) (inc-solved-no (eliminate-from-neighbours board coord (first possibilities)))
         ;; Hidden single method
         ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
         true        (or
@@ -87,7 +87,7 @@
          (filter #(> (count (val %)) 1) (boxes board))))
 
 (defn- solved? [board]
-  (== (board :solvedno) 81))
+  (== (solvedno board) 81))
 
 (defn solve [board]
   (if (solved? board)
