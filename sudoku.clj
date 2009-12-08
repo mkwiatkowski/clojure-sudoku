@@ -63,19 +63,16 @@
         (== size 1) (inc-solved-no (eliminate-from-neighbours board coord (first possibilities)))
         ;; Hidden single method
         ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
-        true        (or
-                     (reduce
-                      (fn [result group]
-                        (or
-                         result
-                         (let [coords-with-value (filter #(contains? (board %) possibility) group)]
-                           (cond
-                             (empty? coords-with-value)        (throw (Error.))
-                             (empty? (rest coords-with-value)) (mark board (first coords-with-value) possibility)
-                             true                              nil))))
-                      nil
-                      (groups-of coord))
-                     board)))
+        true        (loop [groups (groups-of coord)]
+                      (if-let [group (first groups)]
+                        ;; Hidden single method
+                        ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
+                        (let [coords-with-value (filter #(contains? (board %) possibility) group)]
+                          (cond
+                            (empty? coords-with-value)        (throw (Error.))
+                            (empty? (rest coords-with-value)) (mark board (first coords-with-value) possibility)
+                            true                              (recur (rest groups))))
+                        board))))
     board))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
