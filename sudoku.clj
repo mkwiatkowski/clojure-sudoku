@@ -28,15 +28,11 @@
 (let [boxes (for [_ coords] (set (range 1 10)))]
   (def empty-board (vec (concat boxes [0]))))
 
-(defmacro update [map key f]
-  `(let [map# ~map key# ~key]
-     (assoc map# key# (~f (map# key#)))))
 (defmacro boxes [board]
   `(subvec ~board 0 81))
-(defmacro update-coord [board coord f]
-  `(update ~board ~coord ~f))
 (defmacro inc-solved-no [board]
-  `(update ~board 81 inc))
+  `(let [board# ~board]
+     (assoc board# 81 (inc (board# 81)))))
 (defmacro solvedno [board]
   `(~board 81))
 
@@ -56,8 +52,8 @@
 
 (defn eliminate [board coord possibility]
   (if (contains? (board coord) possibility)
-    (let [board (update-coord board coord #(disj % possibility))
-          possibilities (board coord)
+    (let [possibilities (disj (board coord) possibility)
+          board (assoc board coord possibilities)
           size (count possibilities)]
       (cond
         ;; Contradiction.
