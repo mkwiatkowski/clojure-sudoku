@@ -5,13 +5,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Board representation.
 
-(def coords (for [x (range 1 10) y (range 1 10)] [x y]))
-(let [blocks (for [i [1 4 7] j [1 4 7]]
-               (for [x (range i (+ i 3)) y (range j (+ j 3))] (keyword (str [x y]))))
-      rows (partition 9 (map #(keyword (str %)) coords))
-      columns (partition 9 (for [[x y] coords] (keyword (str [y x]))))]
+(def coords (range 0 81))
+(let [blocks (apply concat
+                    (map
+                     (fn [x]
+                       (map #(apply concat %)
+                            (partition 3 (apply interleave (partition 3 x)))))
+                     (partition 9 (partition 3 coords))))
+      rows (partition 9 coords)
+      columns (partition 9 (apply interleave rows))]
   (def groups (concat blocks rows columns)))
-(def coords (map #(keyword (str %)) coords))
 
 (def groups-of
      (into {}
@@ -22,20 +25,20 @@
            (for [c coords]
              [c (vec (disj (apply union (map set (groups-of c))) c))])))
 
-(let [boxes (into {} (for [coord coords] [coord (set (range 1 10))]))]
-  (def empty-board (assoc boxes :solvedno 0)))
+(let [boxes (for [_ coords] (set (range 1 10)))]
+  (def empty-board (vec (concat boxes [0]))))
 
 (defmacro update [map key f]
   `(let [map# ~map key# ~key]
      (assoc map# key# (~f (map# key#)))))
 (defmacro boxes [board]
-  `(dissoc ~board :solvedno))
+  `(subvec ~board 0 81))
 (defmacro update-coord [board coord f]
   `(update ~board ~coord ~f))
 (defmacro inc-solved-no [board]
-  `(update ~board :solvedno inc))
+  `(update ~board 81 inc))
 (defmacro solvedno [board]
-  `(~board :solvedno))
+  `(~board 81))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board. Eliminate a number from the set of possibilities.
@@ -83,8 +86,18 @@
 ;; Solve.
 
 (defn element-with-least-possibilities [board]
-  (apply min-key #(count (val %))
-         (filter #(> (count (val %)) 1) (boxes board))))
+  (loop [min-coord nil
+         min-val nil
+         min-cnt 10
+         i 0
+         values (boxes board)]
+    (if-let [value (first values)]
+      (let [cnt (count value)]
+        (cond
+          (== cnt 2)        [i value]
+          (< 1 cnt min-cnt) (recur i value cnt (inc i) (rest values))
+          true              (recur min-coord min-val min-cnt (inc i) (rest values))))
+      [min-coord min-val])))
 
 (defn- solved? [board]
   (== (solvedno board) 81))
@@ -119,7 +132,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [[c v] (sort (boxes board))] (if (== (count v) 1) (str (first v)) "."))]
+  (let [elements (for [v (boxes board)] (if (== (count v) 1) (str (first v)) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
