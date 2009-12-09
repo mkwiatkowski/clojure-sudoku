@@ -36,6 +36,13 @@
 (defmacro solvedno [board]
   `(~board 81))
 
+(defmacro remove-possibility [board coord possibility]
+  `(disj (~board ~coord) ~possibility))
+(defmacro contains-possibility? [board coord possibility]
+  `(contains? (~board ~coord) ~possibility))
+(def single-possibility first)
+(def number-of-possibilities count)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board. Eliminate a number from the set of possibilities.
 
@@ -45,29 +52,27 @@
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (reduce #(eliminate %1 coord %2) board (disj (board coord) value))))
+     (reduce #(eliminate %1 coord %2) board (remove-possibility board coord value))))
 
 (defn eliminate-from-neighbours [board coord value]
   (reduce #(eliminate %1 %2 value) board (neighbours-of coord)))
 
 (defn eliminate [board coord possibility]
-  (if (contains? (board coord) possibility)
-    (let [possibilities (disj (board coord) possibility)
+  (if (contains-possibility? board coord possibility)
+    (let [possibilities (remove-possibility board coord possibility)
           board (assoc board coord possibilities)
-          size (count possibilities)]
+          size (number-of-possibilities possibilities)]
       (cond
         ;; Contradiction.
         (== size 0) (throw (Error.))
         ;; Naked single method
         ;; http://www.sadmansoftware.com/sudoku/nakedsingle.htm
-        (== size 1) (inc-solved-no (eliminate-from-neighbours board coord (first possibilities)))
+        (== size 1) (inc-solved-no (eliminate-from-neighbours board coord (single-possibility possibilities)))
         ;; Hidden single method
         ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
         true        (loop [groups (groups-of coord)]
                       (if-let [group (first groups)]
-                        ;; Hidden single method
-                        ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
-                        (let [coords-with-value (filter #(contains? (board %) possibility) group)]
+                        (let [coords-with-value (filter #(contains-possibility? board % possibility) group)]
                           (cond
                             (empty? coords-with-value)        (throw (Error.))
                             (empty? (rest coords-with-value)) (mark board (first coords-with-value) possibility)
@@ -85,7 +90,7 @@
          i 0
          values (boxes board)]
     (if-let [value (first values)]
-      (let [cnt (count value)]
+      (let [cnt (number-of-possibilities value)]
         (cond
           (== cnt 2)        [i value]
           (< 1 cnt min-cnt) (recur i value cnt (inc i) (rest values))
@@ -125,7 +130,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [v (boxes board)] (if (== (count v) 1) (str (first v)) "."))]
+  (let [elements (for [v (boxes board)] (if (== (number-of-possibilities v) 1) (str (single-possibility v)) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
