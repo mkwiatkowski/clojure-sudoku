@@ -25,7 +25,7 @@
            (for [c coords]
              [c (vec (disj (apply union (map set (groups-of c))) c))])))
 
-(let [boxes (for [_ coords] (set (range 1 10)))]
+(let [boxes (for [_ coords] 0x3fe)]
   (def empty-board (vec (concat boxes [0]))))
 
 (defmacro boxes [board]
@@ -36,12 +36,24 @@
 (defmacro solvedno [board]
   `(~board 81))
 
-(defmacro remove-possibility [board coord possibility]
-  `(disj (~board ~coord) ~possibility))
+(defmacro int-to-bit [number]
+  `(bit-shift-left 1 ~number))
+(defmacro bit-to-int [number]
+  `(Integer/numberOfTrailingZeros ~number))
+
+(defmacro without [board coord possibility]
+  `(bit-and (~board ~coord) (bit-not ~possibility)))
 (defmacro contains-possibility? [board coord possibility]
-  `(contains? (~board ~coord) ~possibility))
-(def single-possibility first)
-(def number-of-possibilities count)
+  `(not (zero? (bit-and (~board ~coord) ~possibility))))
+(defmacro number-of-possibilities [possibility]
+  `(Integer/bitCount ~possibility))
+(letfn
+    [(e [possibilities]
+        (if (zero? possibilities)
+          '()
+          (let [number (int-to-bit (Integer/numberOfTrailingZeros possibilities))]
+            (cons number (e (bit-and possibilities (bit-not number)))))))]
+  (def each (vec (for [n (range 0x3fe)] (e n)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board. Eliminate a number from the set of possibilities.
@@ -52,14 +64,14 @@
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (reduce #(eliminate %1 coord %2) board (remove-possibility board coord value))))
+     (reduce #(eliminate %1 coord %2) board (each (without board coord value)))))
 
 (defn eliminate-from-neighbours [board coord value]
   (reduce #(eliminate %1 %2 value) board (neighbours-of coord)))
 
 (defn eliminate [board coord possibility]
   (if (contains-possibility? board coord possibility)
-    (let [possibilities (remove-possibility board coord possibility)
+    (let [possibilities (without board coord possibility)
           board (assoc board coord possibilities)
           size (number-of-possibilities possibilities)]
       (cond
@@ -67,7 +79,7 @@
         (== size 0) (throw (Error.))
         ;; Naked single method
         ;; http://www.sadmansoftware.com/sudoku/nakedsingle.htm
-        (== size 1) (inc-solved-no (eliminate-from-neighbours board coord (single-possibility possibilities)))
+        (== size 1) (inc-solved-no (eliminate-from-neighbours board coord possibilities))
         ;; Hidden single method
         ;; http://www.sadmansoftware.com/sudoku/hiddensingle.htm
         true        (loop [groups (groups-of coord)]
@@ -110,7 +122,7 @@
               #(try
                 (solve (mark board coord %))
                 (catch Error e board))
-              values)))
+              (each values))))
        board))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -121,7 +133,7 @@
                coords
                (seq (.split #"\s+" (slurp filename))))
         :when (re-matches #"[0-9]+" v)]
-    [c (new Integer v)]))
+    [c (int-to-bit (Integer/parseInt v))]))
 
 (defn read-board [filename]
   (reduce mark empty-board (read-marks filename)))
@@ -130,7 +142,7 @@
 ;; Printing the board.
 
 (defn- board-as-string [board]
-  (let [elements (for [v (boxes board)] (if (== (number-of-possibilities v) 1) (str (single-possibility v)) "."))]
+  (let [elements (for [v (boxes board)] (if (== (number-of-possibilities v) 1) (str (bit-to-int v)) "."))]
     (join "\n" (for [row (partition 9 elements)] (join " " row)))))
 
 (defn print-board [board]
