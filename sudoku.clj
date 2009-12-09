@@ -136,8 +136,7 @@
 
 (defn main
   ([progname]
-     (printf "Usage: %s puzzle-file...%n" progname)
-     (System/exit 0))
+     (printf "Usage: %s puzzle-file...%n" progname))
   ([_ & filenames]
      (let [start (.. System nanoTime)]
        (doseq [filename filenames]
@@ -146,10 +145,10 @@
        (println
         (format "Solved %d puzzles in %.3f seconds."
                 (count filenames)
-                (/ (- (.. System nanoTime) start) 1000000000.0)))
-       (System/exit 0))))
+                (/ (- (.. System nanoTime) start) 1000000000.0))))))
 
 ;; Hack until clojure allows to differentiate between running a file as
 ;; a script and loading it from another module.
-(if (= "sudoku.clj" (first *command-line-args*))
-  (apply main *command-line-args*))
+(when (= "sudoku.clj" (first *command-line-args*))
+  (apply main *command-line-args*)
+  (System/exit 0))
