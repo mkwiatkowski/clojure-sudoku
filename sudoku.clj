@@ -32,7 +32,7 @@
   `(subvec ~board 0 81))
 (defmacro inc-solved-no [board]
   `(let [board# ~board]
-     (assoc board# 81 (inc (board# 81)))))
+     (assoc! board# 81 (inc (board# 81)))))
 (defmacro solvedno [board]
   `(~board 81))
 
@@ -72,7 +72,7 @@
 (defn eliminate [board coord possibility]
   (if (contains-possibility? board coord possibility)
     (let [possibilities (without board coord possibility)
-          board (assoc board coord possibilities)
+          board (assoc! board coord possibilities)
           size (number-of-possibilities possibilities)]
       (cond
         ;; Contradiction.
@@ -120,7 +120,7 @@
        (first (filter solved?
              (map
               #(try
-                (solve (mark board coord %))
+                (solve (persistent!(mark (transient board) coord %)))
                 (catch Error e board))
               (each values))))
        board))))
@@ -136,7 +136,7 @@
     [c (int-to-bit (Integer/parseInt v))]))
 
 (defn read-board [filename]
-  (reduce mark empty-board (read-marks filename)))
+  (persistent! (reduce mark (transient empty-board) (read-marks filename))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Printing the board.
