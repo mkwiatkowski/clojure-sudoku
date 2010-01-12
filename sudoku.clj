@@ -41,7 +41,7 @@
 (defmacro bit-to-int [number]
   `(Integer/numberOfTrailingZeros ~number))
 
-(defmacro without [board coord possibility]
+(defmacro without-possibility [board coord possibility]
   `(bit-and (~board ~coord) (bit-not ~possibility)))
 (defmacro contains-possibility? [board coord possibility]
   `(not (zero? (bit-and (~board ~coord) ~possibility))))
@@ -55,6 +55,13 @@
             (cons number (e (bit-and possibilities (bit-not number)))))))]
   (def each (vec (for [n (range 0x3fe)] (e n)))))
 
+(defn without-element [seq element]
+  (if-let [current (first seq)]
+    (if (= element current)
+      (rest seq)
+      (cons current (without-element (rest seq) element)))
+    seq))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mark a number on board. Eliminate a number from the set of possibilities.
 
@@ -64,14 +71,17 @@
   ([board element]
      (mark board (element 0) (element 1)))
   ([board coord value]
-     (reduce #(eliminate %1 coord %2) board (each (without board coord value)))))
+     (reduce #(eliminate %1 coord %2) board (each (without-possibility board coord value)))))
 
 (defn eliminate-from-neighbours [board coord value]
   (reduce #(eliminate %1 %2 value) board (neighbours-of coord)))
 
+(defn eliminate-values-from-coords [board coords values]
+  (reduce (fn [b v] (reduce #(eliminate %1 %2 v) b coords)) board (each values)))
+
 (defn eliminate [board coord possibility]
   (if (contains-possibility? board coord possibility)
-    (let [possibilities (without board coord possibility)
+    (let [possibilities (without-possibility board coord possibility)
           board (assoc board coord possibilities)
           size (number-of-possibilities possibilities)]
       (cond
@@ -89,7 +99,19 @@
                             (empty? coords-with-value)        (throw (Error.))
                             (empty? (rest coords-with-value)) (mark board (first coords-with-value) possibility)
                             true                              (recur (rest groups))))
-                        board))))
+                        (if (== size 2)
+                          ;; Naked pair method
+                          ;; http://www.sadmansoftware.com/sudoku/nakedsubset.htm
+                          (loop [groups (groups-of coord)]
+                            (if-let [group (first groups)]
+                              (let [others-from-group (without-element group coord)
+                                    coords-with-same-pair (filter #(== possibilities (board %)) others-from-group)]
+                                (cond
+                                 (empty? coords-with-same-pair)        (recur (rest groups))
+                                 (empty? (rest coords-with-same-pair)) (eliminate-values-from-coords board (without-element others-from-group (first coords-with-same-pair)) possibilities)
+                                 true                                  (throw (Error.))))
+                              board))
+                          board)))))
     board))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
