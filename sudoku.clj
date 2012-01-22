@@ -120,7 +120,7 @@
        (first (filter solved?
              (map
               #(try
-                (solve (persistent!(mark (transient board) coord %)))
+                (solve (persistent! (mark (transient board) coord %)))
                 (catch Error e board))
               (each values))))
        board))))
