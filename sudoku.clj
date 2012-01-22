@@ -153,7 +153,7 @@
 
 (defn main
   ([progname]
-     (printf "Usage: %s puzzle-file...%n" progname))
+     (println (format "Usage: %s puzzle-file..." progname)))
   ([_ & filenames]
      (let [start (.. System nanoTime)]
        (doseq [filename filenames]
