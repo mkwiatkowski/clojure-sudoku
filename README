@@ -1,0 +1,25 @@
+Profile with hprof:
+  java -agentlib:hprof=cpu=times -cp .:$CLOJURE_JAR:$CONTRIB_JAR clojure.main $scriptname $*
+
+Profile with jrat (http://jrat.sourceforge.net/):
+  java -javaagent:shiftone-jrat.jar -cp .:$CLOJURE_JAR:$CONTRIB_JAR clojure.main $scriptname $*
+
+See the jrat results:
+  java -Xmx512M -jar shiftone-jrat.jar
+
+Profile with yjp (http://www.yourkit.com/):
+  java -agentpath:$YJP_PATH/bin/linux-x86-64/libyjpagent.so -cp .:$CLOJURE_JAR:$CONTRIB_JAR clojure.main $scriptname $*
+
+Measure performance:
+  clj measure-performance.clj puzzles/top95/*
+
+
+What I've found was that the performance was tightly dependent on the characteristics of the data structure I used. I started with a naive representation of a board as a sorted map with coordinates as pairs (vectors) of numbers and possibilities as sets. Now I use a vector of integers, which act as bit maps for possibilities. But I tried many different Clojure data structures before arriving at this solution. For example, since I iterated over my board all the time, a simple change like using hash-map instead of sorted-map made the whole thing 2 times faster. Other little things, like using (v 0) instead of (first v) for vectors or avoiding nesting structures, helped as well. Of course, changes to the algorithm had also positive effect on the performance. Things like detecting unsolvable boards faster or changing structure to a mutually recursive "mark" and "eliminate" made a real difference.
+
+Now I got to a point I can't find a way to make it any more faster. You see, Peter Norvig's Python version (http://norvig.com/sudoku.html) still runs faster on my machine. My version will only run faster if you don't count the JVM startup time *and* you allow JIT to kick in. Even after that it's a bit more than thrice as fast. I believe JVM can do much better than 3-4 times faster than CPython. Moreover, Norvig states that he could make the code 10 times faster and now I wonder how to do it in Clojure.
+
+I tried using pmap to distribute puzzles across cores, but apparently the cost of coordination is bigger than the profit on my dual core. I tried implementing a new solving method (naked pair), but that also made things a bit slower. Transients made it a bit faster, but only by about 10%. A bit more came from using "-XX:+AggressiveOpts" JVM option, but that's basically it.
+
+Ideas:
+  - Currently marking a box with number N is the same as elimination of all other possiblities than N from the box. Instead, set the value directly and call eliminate-from-neighbours.
+  - Try int-array instead of vector for board representation. Use aset and aget instead of assoc! and reference by index.
